@@ -1,0 +1,322 @@
+/*
+    LilyGo Ink Screen Series Test
+        - Created by Lewis he
+*/
+
+#include <GxEPD.h> //https://github.com/lewisxhe/GxEPD
+#include <SD.h>
+#include <FS.h>
+#include <Arduino.h>
+#include <Wire.h>
+#include <GxEPD.h>
+#include "SPI.h"
+#include <GxGDEH0213B73/GxGDEH0213B73.h> // 2.13" b/w newer panel
+
+#include GxEPD_BitmapExamples
+
+// FreeFonts from Adafruit_GFX
+#include <Fonts/TomThumb.h>
+#include "meteocons10pt7b.h"
+
+#include <GxIO/GxIO_SPI/GxIO_SPI.h>
+#include <GxIO/GxIO.h>
+#include <WiFi.h>
+
+#include <WiFiMulti.h>
+#include <HTTPClient.h>
+
+#include <ArduinoJson.h>
+#include "SimpleJson.hpp"
+
+
+#define SPI_MOSI 23
+#define SPI_MISO -1
+#define SPI_CLK 18
+
+#define ELINK_SS 5
+#define ELINK_BUSY 4
+#define ELINK_RESET 16
+#define ELINK_DC 17
+
+#define SDCARD_SS 13
+#define SDCARD_CLK 14
+#define SDCARD_MOSI 15
+#define SDCARD_MISO 2
+
+#define BUTTON_PIN 39
+
+#define BUTTON_3 BUTTON_PIN
+#define EPD_CS ELINK_SS
+#define EPD_DC ELINK_DC
+#define EPD_RSET ELINK_RESET
+#define EPD_BUSY ELINK_BUSY
+
+#define LED 19
+
+const char *ssid = "Bao Long Lau 2";
+const char *password = "25042009";
+
+const String endpoint = "http://api.openweathermap.org/data/2.5/weather?q=saigon,pt&APPID=";
+const String key = "538292ce2aa64594a8f145e851a058a1";
+const String saigon = "http://api.openweathermap.org/data/2.5/weather?q=saigon&appid=538292ce2aa64594a8f145e851a058a1";
+WiFiMulti wifiMulti;
+
+GxIO_Class io(SPI, /*CS=5*/ ELINK_SS, /*DC=*/ELINK_DC, /*RST=*/ELINK_RESET);
+GxEPD_Class display(io, /*RST=*/ELINK_RESET, /*BUSY=*/ELINK_BUSY);
+SPIClass SDSPI(VSPI);
+
+bool setupSDCard(void)
+{
+	SDSPI.begin(SDCARD_CLK, SDCARD_MISO, SDCARD_MOSI);
+	return SD.begin(SDCARD_SS, SDSPI);
+}
+
+void testWiFi()
+{
+	WiFi.mode(WIFI_STA);
+	WiFi.disconnect();
+	// WiFi.scanNetworks will return the number of networks found
+	int n = WiFi.scanNetworks();
+
+	Serial.println("scan done");
+	if (n == 0)
+	{
+		Serial.println("no networks found");
+	}
+	else
+	{
+		Serial.print(n);
+		Serial.println(" networks found");
+		for (int i = 0; i < n; ++i)
+		{
+			// Print SSID and RSSI for each network found
+			Serial.print(i + 1);
+			Serial.print(": ");
+			Serial.print(WiFi.SSID(i));
+			Serial.print(" (");
+			Serial.print(WiFi.RSSI(i));
+			Serial.print(")");
+			Serial.println((WiFi.encryptionType(i) == WIFI_AUTH_OPEN) ? " " : "*");
+			delay(10);
+		}
+	}
+	Serial.println("");
+}
+
+void connectToWifi()
+{
+	int count = 0;
+	int led_val = 1;
+
+	WiFi.begin(ssid, password);
+
+	pinMode(LED, OUTPUT);
+	digitalWrite(LED, 0);
+	wl_status_t wifi_status = WL_CONNECT_FAILED;
+
+	while ((wifi_status != WL_CONNECTED) && count < 100)
+	{
+		wifi_status = WiFi.status();
+		led_val ^= 1;
+		count++;
+		delay(500);
+		Serial.printf("[%8d]Connecting to WiFi..\n", count);
+		digitalWrite(LED, led_val);
+	}
+	if (wifi_status == WL_CONNECTED)
+	{
+		digitalWrite(LED, 1);
+		Serial.println("Connected to the WiFi network");
+	}
+	else
+	{
+		digitalWrite(LED, 0);
+		Serial.println("Cannot connect to the WiFi network");
+	}
+
+	WiFi.disconnect();
+}
+
+void showFont(const char name[], const GFXfont *f)
+{
+	display.fillScreen(GxEPD_WHITE);
+	display.setTextColor(GxEPD_BLACK);
+	display.setFont(f);
+	display.setCursor(0, 0);
+	display.println();
+	display.println(name);
+	display.println(" !\"#$%&'()*+,-./");
+	display.println("0123456789:;<=>?");
+	display.println("@ABCDEFGHIJKLMNO");
+	display.println("PQRSTUVWXYZ[\\]^_");
+	display.println("`abcdefghijklmno");
+	display.println("pqrstuvwxyz{|}~ ");
+	display.update();
+	delay(5000);
+}
+
+void drawCornerTest()
+{
+	display.drawCornerTest();
+	delay(5000);
+	uint8_t rotation = display.getRotation();
+	for (uint16_t r = 0; r < 4; r++)
+	{
+		display.setRotation(r);
+		display.fillScreen(GxEPD_WHITE);
+		display.fillRect(0, 0, 8, 8, GxEPD_BLACK);
+		display.fillRect(display.width() - 18, 0, 16, 16, GxEPD_BLACK);
+		display.fillRect(display.width() - 25, display.height() - 25, 24, 24, GxEPD_BLACK);
+		display.fillRect(0, display.height() - 33, 32, 32, GxEPD_BLACK);
+		display.update();
+		delay(2000);
+	}
+	display.setRotation(rotation); // restore
+}
+
+void getWeatherStatus()
+{
+	StaticJsonDocument<200> doc;
+	SimpleJson Jsondata;
+
+	wifiMulti.addAP(ssid, password);
+	// wait for WiFi connection
+	if ((wifiMulti.run() == WL_CONNECTED))
+	{
+
+		HTTPClient http;
+
+		Serial.print("[HTTP] begin...\n");
+		// configure traged server and url
+		http.begin(saigon); //HTTP
+
+		Serial.print("[HTTP] GET...\n");
+		// start connection and send HTTP header
+		int httpCode = http.GET();
+
+		// httpCode will be negative on error
+		if (httpCode > 0)
+		{
+			// HTTP header has been send and Server response header has been handled
+			Serial.printf("[HTTP] GET... code: %d\n", httpCode);
+
+			// file found at server
+			if (httpCode == HTTP_CODE_OK)
+			{
+				String payload = http.getString();
+				
+				Jsondata.updateJsonData(payload);
+				String key = "name";
+				Jsondata.getJsonValue(key);
+
+				key = "temp";
+				Jsondata.getJsonValue(key);
+
+				key = "pressure";
+				Jsondata.getJsonValue(key);
+
+				key = "dt";
+				Jsondata.getJsonValue(key);
+
+				key = "main";
+				Jsondata.getJsonValue(key);
+
+				/* Showing Json data */
+				// for (int i = 0; i < payload.length(); i++)
+				// {
+				// 	if (payload[i] == '{' || payload[i] == '[')
+				// 		Serial.printf("\n%c\n\t", payload[i]);
+				// 	else if (payload[i] == ',')
+				// 		Serial.printf("%c\n\t", payload[i]);
+				// 	else if (payload[i] == '}' || payload[i] == ']')
+				// 		Serial.printf("\n\b%c", payload[i]);
+				// 	else
+				// 		Serial.print(payload[i]);
+				// }
+			}
+		}
+		else
+		{
+			Serial.printf("[HTTP] GET... failed, error: %s\n", http.errorToString(httpCode).c_str());
+		}
+
+		http.end();
+	}
+}
+
+
+void setup()
+{
+	
+
+	bool rlst = false;
+	Serial.begin(115200);
+	Serial.println();
+	Serial.println("setup");
+
+	//return;
+
+	SPI.begin(SPI_CLK, SPI_MISO, SPI_MOSI, ELINK_SS);
+	display.init(); // enable diagnostic output on Serial
+	display.setTextColor(GxEPD_BLACK);
+
+	testWiFi();
+
+	rlst = setupSDCard();
+
+	display.setRotation(0);
+	display.fillScreen(GxEPD_WHITE);
+
+	display.drawExampleBitmap(BitmapExample1, 0, 0, GxEPD_WIDTH, GxEPD_HEIGHT, GxEPD_BLACK);
+	//display.drawExampleBitmap(img_bits, 0, 0, img_width, img_width, GxEPD_BLACK);
+
+	display.setRotation(1);
+	display.setCursor(20, display.height() - 15);
+	String sizeString = "SD:" + String(SD.cardSize() / 1024.0 / 1024.0 / 1024.0) + "G";
+	display.println(rlst ? sizeString : "SD:N/A");
+
+	int16_t x1, x2;
+	uint16_t w, h;
+	String str = GxEPD_BitmapExamplesQ;
+	str = str.substring(2, str.lastIndexOf("/"));
+	display.getTextBounds(str, 0, 0, &x1, &x2, &w, &h);
+	display.setCursor(display.width() - w - 5, display.height() - 15);
+	display.println(str);
+
+	display.update();
+
+	connectToWifi();
+
+	delay(10000);
+}
+
+void loop()
+{
+	drawCornerTest();
+
+	while (0)
+	{
+		getWeatherStatus();
+		delay(1500);
+	}
+	int i = 0;
+
+	while (i < 4)
+	{
+		display.setRotation(i);
+		showFont("meteocons10pt7b", &meteocons10pt7b);
+		//showFont("FreeMonoBold18pt7b", &FreeMonoBold18pt7b);
+		//showFont("FreeMonoBold24pt7b", &FreeMonoBold24pt7b);
+		i++;
+	}
+
+	display.fillScreen(GxEPD_WHITE);
+
+	display.update();
+
+	display.powerDown();
+
+	esp_sleep_enable_ext1_wakeup(((uint64_t)(((uint64_t)1) << BUTTON_3)), ESP_EXT1_WAKEUP_ALL_LOW);
+
+	esp_deep_sleep_start();
+}
