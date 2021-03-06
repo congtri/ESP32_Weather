@@ -1,11 +1,5 @@
 #include "OpenWeatherParse.h"
 
-typedef struct
-{
-	char *data;
-	int length;
-} sub_data_st;
-
 #define IS_PARSED_DATA_VALID(DATA) (DATA.length)
 
 typedef struct
@@ -154,24 +148,6 @@ void OpenWeatherParse::convertUnixTimeToHumanTime(long int seconds)
 	this->time.sec = secondss;
 }
 
-void showData(value_data_st &dat)
-{
-	if (dat.data != nullptr)
-	{
-		cout << "\nParsed data: \n";
-		int i;
-		for (i = 0; i < dat.length; i++)
-		{
-			cout << dat.data[i];
-		}
-		cout << " - lenght: " << dat.length << endl;
-	}
-	else
-	{
-		cout << "\nData is empty" << endl;
-	}
-}
-
 
 paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 {
@@ -182,8 +158,7 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 	this->initJsonString(&weather_data);
 
 	/* Parse weather id */
-	this->findJsonValue(weather_data, "id");
-	showData(this->json_value);
+	this->findJsonValue("id");
 	if (this->json_value.length)
 	{
 		i_value = atoi(this->json_value.data);

@@ -56,42 +56,38 @@ uint8_t connectToWifi()
 	return wifi_status;
 }
 
-
-
-int sendRequestAndGetPayloadData(const String &api, String &rx_payload)
+int sendRequestAndGetPayloadData(const String &url, String &rx_payload)
 {
-	int error = 0;
+	int error = 1;
 	String payload;
 
 	// wait for WiFi connection
 	if ((wifiMulti.run() == WL_CONNECTED))
 	{
-		SLOG_DEBUG("[HTTP] begin...");
+		SLOG_DEBUG("[HTTP] begin...: %s", url.c_str());
 		// configure traged server and url
-		http.begin(api);
+		http.begin(url);
 
 		SLOG_DEBUG("[HTTP] GET...");
 		// start connection and send HTTP header
 		int httpCode = http.GET();
 		// httpCode will be negative on error
-		if (httpCode > 0)
+		if (httpCode == HTTP_CODE_OK)
 		{
 			// HTTP header has been send and Server response header has been handled
 			SLOG_DEBUG("[HTTP] GET... code: %d", httpCode);
 
 			rx_payload = http.getString();
 			// file found at server
-			if (httpCode == HTTP_CODE_OK)
-			{
-				/* Showing Json data */
-				//showPayloadData(payload);
-				error = 0;
-			}
+
+			/* Showing Json data */
+			//showPayloadData(payload);
+			error = 0;
 		}
 		else
 		{
 			error = 1;
-			SLOG_DEBUG("[HTTP] GET... failed, error: %s", http.errorToString(httpCode).c_str());
+			SLOG_DEBUG("[HTTP] GET... failed, error[%d]: %s", httpCode, http.errorToString(httpCode).c_str());
 		}
 
 		http.end();
@@ -107,15 +103,20 @@ int sendRequestAndGetPayloadData(const String &api, String &rx_payload)
 int getWeatherStatus(OpenWeatherParse &weather)
 {
 	int error = 1;
-	String weather_data;
 	int error_code;
 	//String weather_data = "\"{\"coord\":{\"lon\":-122.08,\"lat\":37.39},\"weather\":[{\"id\":800,\"main\":\"Clear\",\"description\":\"clearsky\",\"icon\":\"01d\"}],\"base\":\"stations\",\"main\":{\"temp\":30,\"feels_like\":281.86,\"temp_min\":280.37,\"temp_max\":284.26,\"pressure\":1023,\"humidity\":100},\"visibility\":16093,\"wind\":{\"speed\":1.5,\"deg\":350},\"clouds\":{\"all\":1},\"dt\":1560350645,\"sys\":{\"type\":1,\"id\":5122,\"message\":0.0139,\"country\":\"US\",\"sunrise\":1560343627,\"sunset\":1560396563},\"timezone\":-25200,\"id\":420006353,\"name\":\"MountainView\",\"cod\":200}\"";
 
-	sendRequestAndGetPayloadData(saigon, weather_data);
+	String weather_data;
+	error = sendRequestAndGetPayloadData(saigon, weather_data);
+	if(error)
+	{
+		return error;
+	}
+
 	//Serial.print(payload);
 	delay(1000);
 	error_code = weather.parseOpenWeatherData(weather_data);
-	
+
 	if (error_code == PARSE_DONE)
 	{
 		error = 0;
@@ -198,7 +199,7 @@ void displayToScreen(OpenWeatherParse &weather_data)
 	// display.printf("Tri dep trai vl :D");
 
 	display.setCursor(x + 10, y - 20);
-	display.printf("Humidity: %d", weather_data.weather.humidity);
+	display.printf("Humidity: %d%%", weather_data.weather.humidity);
 
 	display.setCursor(x + 10, y);
 	display.printf("Pressure: %d", weather_data.weather.pressure);
@@ -220,26 +221,47 @@ void displayToScreen(OpenWeatherParse &weather_data)
 	display.update();
 }
 
-void testWorldClock()
+int getCurrenTime(WorldClockParse &world_time)
 {
-	while (1)
+	String payload;
+	int error = 0;
+	error = sendRequestAndGetPayloadData(world_clock, payload);
+	Serial.println(payload);
+	if (error == 0)
 	{
-		String payload;
-		sendRequestAndGetPayloadData(world_clock, payload);
-		Serial.println(payload);
-		delay(1000);
+		error = world_time.parseWorldClockData(payload);
 	}
+	return error;
 }
+
 void loop()
 {
-	//testWorldClock();
 	OpenWeatherParse weather_data;
+	WorldClockParse world_time;
+
+	while (1)
+	{
+		getWeatherStatus(weather_data);
+		delay(6000);
+		getCurrenTime(world_time);
+		delay(6000);
+	}
 
 	while (1)
 	{
 		delay(1000);
 		if (getWeatherStatus(weather_data) == 0)
 		{
+			if (getCurrenTime(world_time) == 0)
+			{
+				weather_data.time.day = world_time.time.day;
+				weather_data.time.month = world_time.time.month;
+				weather_data.time.year = world_time.time.year;
+
+				weather_data.time.hour = world_time.time.hour;
+				weather_data.time.min = world_time.time.min;
+			}
+
 			displayToScreen(weather_data);
 		}
 		else

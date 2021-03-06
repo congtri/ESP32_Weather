@@ -1,5 +1,5 @@
 #include "SimpleJson.h"
-#include "string.h"
+#include <string>
 
 #define PADDING			(2) /* This is size of charactor :" */
 
@@ -29,12 +29,12 @@ void SimpleJson::initJsonString(String *json)
 
 int SimpleJson::findJsonValue(String key)
 {
-
 	int s_pos = 0, e_pos = 0;
     int error = 0;
 
 	/* Find the key of json */
     String *json = this->json_string;
+	const char *c_json = this->json_string->c_str();
 
 	s_pos = json->indexOf(key);
 
@@ -54,7 +54,7 @@ int SimpleJson::findJsonValue(String key)
 		{
 			if (json->charAt(e_pos) == '\n' || json->charAt(e_pos) == ',' || json->charAt(e_pos) == '"')
 			{
-				this->json_value.data = (char *)&json[s_pos];
+				this->json_value.data = (char *)&c_json[s_pos];
 				this->json_value.length = e_pos - s_pos;
 				
                 error = 0;
@@ -76,6 +76,9 @@ int SimpleJson::findJsonValue(String &json_data, String key)
 {
 	int s_pos = 0, e_pos = 0;
     int error = 0;
+
+	/* reinit the json string */
+	this->json_string = &json_data;
 
 	/* Find the key of json */
     String *json = this->json_string;
@@ -115,4 +118,22 @@ int SimpleJson::findJsonValue(String &json_data, String key)
     }
 
 	return error;
+}
+
+void SimpleJson::showJsonValueData()
+{
+	if (this->json_value.data != nullptr)
+	{
+		Serial.print("\nParsed data: ");
+		int i;
+		for (i = 0; i < this->json_value.length ; i++)
+		{
+			Serial.printf("%c", this->json_value.data[i]);
+		}
+		Serial.printf(" - lenght: %d\n", this->json_value.length);
+	}
+	else
+	{
+		Serial.print("\nData is empty\n");
+	}
 }
