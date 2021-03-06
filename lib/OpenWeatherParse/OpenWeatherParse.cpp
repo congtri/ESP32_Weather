@@ -1,5 +1,4 @@
 #include "OpenWeatherParse.h"
-#include "OpenWeatherCodeMeaning.h"
 
 typedef struct
 {
@@ -8,6 +7,34 @@ typedef struct
 } sub_data_st;
 
 #define IS_PARSED_DATA_VALID(DATA) (DATA.length)
+
+typedef struct
+{
+	const char *icon;
+	char code;
+} icon_map_t;
+
+#define ICON_MAP_TABLE_SIZE (18)
+const icon_map_t icon_map[] = {
+	{"01d", 'B'},
+	{"01n", 'C'},
+	{"02d", 'H'},
+	{"02n", 'I'},
+	{"03d", 'N'},
+	{"03n", '5'},
+	{"04d", 'Y'},
+	{"04n", '%'},
+	{"09d", 'Q'},
+	{"09n", '7'},
+	{"10d", 'R'},
+	{"10n", '8'},
+	{"11d", 'Z'},
+	{"11n", '&'},
+	{"13d", 'W'},
+	{"13n", '#'},
+	{"50d", 'J'},
+	{"50n", 'K'}};
+
 OpenWeatherParse::OpenWeatherParse()
 {
 }
@@ -15,7 +42,6 @@ OpenWeatherParse::OpenWeatherParse()
 OpenWeatherParse::~OpenWeatherParse()
 {
 }
-
 
 // Unix time is in seconds and
 // Humar Readable Format:
@@ -64,7 +90,6 @@ void OpenWeatherParse::convertUnixTimeToHumanTime(long int seconds)
 	{
 		while (true)
 		{
-
 			if (index == 1)
 			{
 				if (extraDays - 29 < 0)
@@ -129,11 +154,11 @@ void OpenWeatherParse::convertUnixTimeToHumanTime(long int seconds)
 	this->time.sec = secondss;
 }
 
-void showData(sub_data_st &dat)
+void showData(value_data_st &dat)
 {
 	if (dat.data != nullptr)
 	{
-		cout << "Parsed data: ";
+		cout << "\nParsed data: \n";
 		int i;
 		for (i = 0; i < dat.length; i++)
 		{
@@ -147,196 +172,189 @@ void showData(sub_data_st &dat)
 	}
 }
 
-sub_data_st findJsonValue(String &data, String subdata)
+
+paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 {
-	int s_pos = 0, e_pos = 0;
-	sub_data_st dat = {nullptr, 0};
+	uint8_t idx = 0;
+	char icon_buf[4] = {0};
+	long int i_value = 0; /* This variable is used to converd from char to int */
+	float f_value = 0;	  /* This variable is used to converd from char to float */
+	this->initJsonString(&weather_data);
 
-	/* Find the key of json */
-	s_pos = data.indexOf(subdata);
-
-	if (s_pos != string::npos)
+	/* Parse weather id */
+	this->findJsonValue(weather_data, "id");
+	showData(this->json_value);
+	if (this->json_value.length)
 	{
-		s_pos = s_pos + subdata.length() + PADDING;
-		e_pos = s_pos + 1;
+		i_value = atoi(this->json_value.data);
+		this->weather.id = (int)i_value;
+	}
+	else
+	{
+		return PARSE_ID_ERROR;
+	}
 
-		if (data.charAt(s_pos) == '"')
-		{
-			s_pos++;
-			e_pos++;
-		}
+	/* Parse weather description */
+	this->findJsonValue(weather_data, "description");
+	if (this->json_value.length)
+	{
+		memset(this->weather.description, '\0', 40);
+		memcpy(this->weather.description, this->json_value.data, this->json_value.length);
+	}
+	else
+	{
+		return PARSE_DES_ERROR;
+	}
 
-		/* Loking for the end position of json string value */
-		for (; e_pos < data.length(); e_pos++)
+	/* Parse weather icon */
+	this->findJsonValue(weather_data, "icon");
+	if (this->json_value.length)
+	{
+		memset(icon_buf, '\0', sizeof(icon_buf));
+		memcpy(icon_buf, this->json_value.data, this->json_value.length); /* expected lenght is 3 */
+		this->weather.icon_code = ')';							  /* NA data icon */
+		for (idx = 0; idx < ICON_MAP_TABLE_SIZE; idx++)
 		{
-			if (data.charAt(e_pos) == '\n' || data.charAt(e_pos) == ',' || data.charAt(e_pos) == '"')
+			if (strcmp(icon_buf, icon_map[idx].icon) == 0)
 			{
-				dat.data = &data[s_pos];
-				dat.length = e_pos - s_pos;
+				this->weather.icon_code = icon_map[idx].code;
 				break;
 			}
 		}
 	}
+	else
+	{
+		return PARSE_ICON_ERROR;
+	}
 
-	return dat;
-}
+	/* Parse tempareture data */
+	this->findJsonValue(weather_data, "temp");
+	if (this->json_value.length)
+	{
+		f_value = atof(this->json_value.data);
+		this->weather.temp = f_value;
+	}
+	else
+	{
+		return PARSE_TEMP_ERROR;
+	}
 
-paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
-{
-	sub_data_st parsed_value;
-	uint8_t idx = 0;
-	long int i_value = 0; /* This variable is used to converd from char to int */
-	float f_value = 0; /* This variable is used to converd from char to float */
+	/* Parse tempareture feels_like data */
+	this->findJsonValue(weather_data, "feels_like");
+	if (this->json_value.length)
+	{
+		f_value = atof(this->json_value.data);
+		this->weather.feels_like = f_value;
+	}
+	else
+	{
+		return PARSE_FEELLIKE_ERROR;
+	}
+
+	/* Parse tempareture temp_min data */
+	this->findJsonValue(weather_data, "temp_min");
+	if (this->json_value.length)
+	{
+		f_value = atof(this->json_value.data);
+		this->weather.temp_min = f_value;
+	}
+	else
+	{
+		return PARSE_TEMP_MIN_ERROR;
+	}
+
+	/* Parse tempareture temp_max data */
+	this->findJsonValue(weather_data, "temp_max");
+	if (this->json_value.length)
+	{
+		f_value = atof(this->json_value.data);
+		this->weather.temp_max = f_value;
+	}
+	else
+	{
+		return PARSE_TEMP_MAX_ERROR;
+	}
+
+	/* Parse pressure data */
+	this->findJsonValue(weather_data, "pressure");
+	if (this->json_value.length)
+	{
+		i_value = atoi(this->json_value.data);
+		this->weather.pressure = i_value;
+	}
+	else
+	{
+		return PARSE_PRESSURE_ERROR;
+	}
+
+	/* Parse humidity data */
+	this->findJsonValue(weather_data, "humidity");
+	if (this->json_value.length)
+	{
+		i_value = atoi(this->json_value.data);
+		this->weather.humidity = i_value;
+	}
+	else
+	{
+		return PARSE_HUMIDITY_ERROR;
+	}
+
+	/* Parse location data */
+	this->findJsonValue(weather_data, "country");
+	if (this->json_value.length)
+	{
+		memset(this->location.country, '\0', LOCATION_SIZE);
+		memcpy(this->location.country, this->json_value.data, this->json_value.length);
+	}
+	else
+	{
+		return PARSE_COUNTRY_ERROR;
+	}
+
+	/* Parse city name data */
+	this->findJsonValue(weather_data, "name");
+	if (this->json_value.length)
+	{
+		memset(this->location.city, '\0', LOCATION_SIZE);
+		memcpy(this->location.city, this->json_value.data, this->json_value.length);
+	}
+	else
+	{
+		return PARSE_CITYNAME_ERROR;
+	}
+
+	/* Parse timezone data */
+	this->findJsonValue(weather_data, "timezone");
+	if (this->json_value.length)
+	{
+		i_value = atoi(this->json_value.data);
+		this->location.timezone = i_value;
+	}
+	else
+	{
+		return PARSE_TIMEZONE_ERROR;
+	}
 
 	/* Get date and time data */
-	parsed_value = findJsonValue(weather_data, "dt");
-	if (IS_PARSED_DATA_VALID(parsed_value))
+	this->findJsonValue(weather_data, "dt");
+	if (this->json_value.length)
 	{
-		i_value = atoi(parsed_value.data);
+		i_value = atoi(this->json_value.data);
+		i_value = i_value + this->location.timezone;
 		convertUnixTimeToHumanTime(i_value);
 	}
 	else
 	{
 		return PARSE_TIME_ERROR;
 	}
-
-	/* Parse weather data */
-	parsed_value = findJsonValue(weather_data, "id");
-	if (IS_PARSED_DATA_VALID(parsed_value))
-	{
-		i_value = atoi(parsed_value.data);
-		this->weather.id = (int)i_value;
-
-		for (idx = 0; idx < CODE_TABLE_SIZE; idx++)
-		{
-			if (i_value == OpenWeatherCodeMeaningTable[idx].id)
-			{
-				this->weather.description = OpenWeatherCodeMeaningTable[idx].description;
-				this->weather.weather_icon_code = OpenWeatherCodeMeaningTable[idx].icon_code;
-			}
-		}
-	}
-	else
-	{
-		return PARSE_ID_ERROR;
-	}
-
-	/* Parse tempareture data */
-	parsed_value = findJsonValue(weather_data, "temp");
-	if (IS_PARSED_DATA_VALID(parsed_value))
-	{
-		f_value = atof(parsed_value.data);
-		this->weather.temp = f_value;
-	}
-	else
-	{
-		return PARSE_ID_ERROR;
-	}
-
-	/* Parse tempareture feels_like data */
-	parsed_value = findJsonValue(weather_data, "feels_like");
-	if (IS_PARSED_DATA_VALID(parsed_value))
-	{
-		f_value = atof(parsed_value.data);
-		this->weather.feels_like = f_value;
-	}
-	else
-	{
-		return PARSE_ID_ERROR;
-	}
-
-	/* Parse tempareture temp_min data */
-	parsed_value = findJsonValue(weather_data, "temp_min");
-	if (IS_PARSED_DATA_VALID(parsed_value))
-	{
-		f_value = atof(parsed_value.data);
-		this->weather.temp_min = f_value;
-	}
-	else
-	{
-		return PARSE_ID_ERROR;
-	}
-
-	/* Parse tempareture temp_max data */
-	parsed_value = findJsonValue(weather_data, "temp_max");
-	if (IS_PARSED_DATA_VALID(parsed_value))
-	{
-		f_value = atof(parsed_value.data);
-		this->weather.temp_max = f_value;
-	}
-	else
-	{
-		return PARSE_ID_ERROR;
-	}
-
-	/* Parse pressure data */
-	parsed_value = findJsonValue(weather_data, "pressure");
-	if (IS_PARSED_DATA_VALID(parsed_value))
-	{
-		i_value = atoi(parsed_value.data);
-		this->weather.pressure = i_value;
-	}
-	else
-	{
-		return PARSE_ID_ERROR;
-	}
-
-	/* Parse humidity data */
-	parsed_value = findJsonValue(weather_data, "humidity");
-	if (IS_PARSED_DATA_VALID(parsed_value))
-	{
-		i_value = atoi(parsed_value.data);
-		this->weather.humidity = i_value;
-	}
-	else
-	{
-		return PARSE_ID_ERROR;
-	}
-
-	/* Parse location data */
-	parsed_value = findJsonValue(weather_data, "country");
-	if (IS_PARSED_DATA_VALID(parsed_value))
-	{
-		memset(this->location.country, '\0', LOCATION_SIZE);
-		memcpy(this->location.country,parsed_value.data,parsed_value.length);
-	}
-	else
-	{
-		return PARSE_ID_ERROR;
-	}
-
-	/* Parse city name data */
-	parsed_value = findJsonValue(weather_data, "name");
-	if (IS_PARSED_DATA_VALID(parsed_value))
-	{
-		memset(this->location.city, '\0', LOCATION_SIZE);
-		memcpy(this->location.city,parsed_value.data,parsed_value.length);
-	}
-	else
-	{
-		return PARSE_ID_ERROR;
-	}
-
-	/* Parse timezone data */
-	parsed_value = findJsonValue(weather_data, "timezone");
-	if (IS_PARSED_DATA_VALID(parsed_value))
-	{
-		i_value = atoi(parsed_value.data);
-		this->location.timezone = i_value;
-	}
-	else
-	{
-		return PARSE_ID_ERROR;
-	}
 	return PARSE_DONE;
 }
 
-void OpenWeatherParse::TestFunction()
+void OpenWeatherParse::showInforInConsole()
 {
 	Serial.printf("\n%s - %s - Timezone: %d", this->location.city, this->location.country, this->location.timezone);
-	Serial.printf("\n%d:%d:%d - %d\/%d\/%d", this->time.hour, this->time.min, this->time.sec, this->time.day, this->time.month, this->time.year);
-	Serial.printf("\nWeather ID: %d - icon code: %d - Description: %s", this->weather.id, this->weather.weather_icon_code, this->weather.description);
-	Serial.printf("\nTemperature: %f - Feel like: %f - Min: %f - Max: %f", this->weather.temp, this->weather.feels_like, this->weather.temp_min, this->weather.temp_max);
+	Serial.printf("\n%02d:%02d:%02d - %02d/%02d/%4d", this->time.hour, this->time.min, this->time.sec, this->time.day, this->time.month, this->time.year);
+	Serial.printf("\nWeather ID: %d - icon code: %d - Description: %s", this->weather.id, this->weather.icon_code, this->weather.description);
+	Serial.printf("\nTemperature: %.02f - Feel like: %.02f - Min: %.02f - Max: %.02f", this->weather.temp, this->weather.feels_like, this->weather.temp_min, this->weather.temp_max);
 	Serial.printf("\nPessure: %d - Humidity: %d", this->weather.pressure, this->weather.humidity);
 }
-

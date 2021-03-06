@@ -13,8 +13,14 @@
 #include GxEPD_BitmapExamples
 
 // FreeFonts from Adafruit_GFX
-#include <Fonts/TomThumb.h>
-#include "meteocons10pt7b.h"
+#include "meteocons30pt7b.h"
+#include <Fonts/FreeSans9pt7b.h>
+#include <Fonts/FreeSansBold9pt7b.h>
+#include <Fonts/FreeSansBold12pt7b.h>
+#include <Fonts/FreeSansBold24pt7b.h>
+#include <Fonts/FreeMonoBold24pt7b.h>
+#include <Fonts/Picopixel.h>
+#include <Fonts/Org_01.h>
 
 #include <GxIO/GxIO_SPI/GxIO_SPI.h>
 #include <GxIO/GxIO.h>
@@ -22,6 +28,8 @@
 
 #include <WiFiMulti.h>
 #include <HTTPClient.h>
+
+#include "serial_debug.h"
 
 #define SPI_MOSI 23
 #define SPI_MISO -1

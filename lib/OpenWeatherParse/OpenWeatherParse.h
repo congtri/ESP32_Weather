@@ -6,16 +6,16 @@
 #include <string>
 #include <WString.h>
 #include <Arduino.h>
+#include "SimpleJson.h"
 
 using namespace std;
 
-#define PADDING			(2) /* This is size of charactor :" */
 #define LOCATION_SIZE	(20)
 typedef struct
 {
 	int id;
-	int weather_icon_code;
-	char* description;
+	char icon_code;
+	char description[40];
 
 	float temp;
 	float feels_like;
@@ -51,26 +51,40 @@ typedef struct
 typedef enum
 {
 	PARSE_DONE = 0,
-	PARSE_TIME_ERROR,
 	PARSE_ID_ERROR,
+	PARSE_DES_ERROR,
+	PARSE_ICON_ERROR,
+	PARSE_TEMP_ERROR,
+	PARSE_FEELLIKE_ERROR,
+	PARSE_TEMP_MIN_ERROR,
+	PARSE_TEMP_MAX_ERROR,
+	PARSE_PRESSURE_ERROR,
+	PARSE_HUMIDITY_ERROR,
+	PARSE_COUNTRY_ERROR,
+	PARSE_CITYNAME_ERROR,
+	PARSE_TIMEZONE_ERROR,
+	PARSE_TIME_ERROR,
 	PARSE_ERROR_UNDEFINE
 }paser_error_code_e;
 
-class OpenWeatherParse
+class OpenWeatherParse:SimpleJson
 {
 private:
-	zone_st			location;
-	weather_st		weather;
-	date_time_st	time;
 
+	
 	void convertUnixTimeToHumanTime(long int seconds);
 	
 public:
+	zone_st			location;
+	weather_st		weather;
+	date_time_st	time;
+	
 	OpenWeatherParse();
 	~OpenWeatherParse();
 	static OpenWeatherParse *getInstance();
-	void TestFunction();
+	void showInforInConsole();
 	paser_error_code_e parseOpenWeatherData(String &weather_data);
+	char getIconCode();
 	
 };
 
