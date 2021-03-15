@@ -131,10 +131,9 @@ int WorldClockParse::parseWorldClockData(String &json)
 
 	/* Parse weather id */
 	this->findJsonValue("currentFileTime");
-	//this->showJsonValueData();
 	if (this->json_value.length)
 	{
-		i_value = atoll(this->json_value.data);
+		this->convertDataTollint(this->json_value, i_value);
 		this->convertFileTimeToHumanTime(i_value);
 		Serial.printf("\n%02d:%02d:%02d - %02d/%02d/%4d", this->time.hour, this->time.min, this->time.sec, this->time.day, this->time.month, this->time.year);
 	}

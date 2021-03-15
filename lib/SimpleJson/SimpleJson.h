@@ -29,6 +29,11 @@ public:
 
 	void initJsonString(String *json);
 	void showJsonValueData();
+
+	uint8_t convertDataToInt(value_data_st &jdata, int &int_number);
+	uint8_t convertDataTollint(value_data_st &jdata, long long int &llint_number);
+	uint8_t convertDataToFloat(value_data_st &jdata, float &float_number);
+
 };
 
 #endif
