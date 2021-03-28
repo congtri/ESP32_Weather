@@ -1,14 +1,15 @@
 #include "hardware_define.h"
 #include "OpenWeatherParse.h"
 #include "WorldClockParse.h"
+#include "std_data_define.h"
 
 const char *ssid = "Bao Long Lau 2";
 const char *password = "25042009";
 
 const String saigon = "http://api.openweathermap.org/data/2.5/weather?&units=metric&q=saigon&appid=e97f1ff2ec74d0bc7f1931e6daf796cb";
-const String world_clock = "http://worldclockapi.com/api/json/est/now";
+const String world_clock = "http://worldclockapi.com/api/json/utc/now";
 WiFiMulti wifiMulti;
-HTTPClient http;
+
 
 /* Declare SPI for e-ink LCD */
 GxIO_Class io(SPI, ELINK_SS, ELINK_DC, ELINK_RESET);
@@ -58,7 +59,8 @@ uint8_t connectToWifi()
 
 int sendRequestAndGetPayloadData(const String &url, String &rx_payload)
 {
-	int error = 1;
+	HTTPClient http;
+	int error = ERROR;
 	String payload;
 
 	// wait for WiFi connection
@@ -82,11 +84,10 @@ int sendRequestAndGetPayloadData(const String &url, String &rx_payload)
 
 			/* Showing Json data */
 			//showPayloadData(payload);
-			error = 0;
+			error = NO_ERROR;
 		}
 		else
 		{
-			error = 1;
 			SLOG_DEBUG("[HTTP] GET... failed, error[%d]: %s", httpCode, http.errorToString(httpCode).c_str());
 		}
 
@@ -94,7 +95,7 @@ int sendRequestAndGetPayloadData(const String &url, String &rx_payload)
 	}
 	else
 	{
-		error = 1;
+		error = ERROR;
 	}
 
 	return error;
@@ -102,7 +103,7 @@ int sendRequestAndGetPayloadData(const String &url, String &rx_payload)
 
 int getWeatherStatus(OpenWeatherParse &weather)
 {
-	int error = 1;
+	int error = NO_ERROR;
 	int error_code;
 	//String weather_data = "\"{\"coord\":{\"lon\":-122.08,\"lat\":37.39},\"weather\":[{\"id\":800,\"main\":\"Clear\",\"description\":\"clearsky\",\"icon\":\"01d\"}],\"base\":\"stations\",\"main\":{\"temp\":30,\"feels_like\":281.86,\"temp_min\":280.37,\"temp_max\":284.26,\"pressure\":1023,\"humidity\":100},\"visibility\":16093,\"wind\":{\"speed\":1.5,\"deg\":350},\"clouds\":{\"all\":1},\"dt\":1560350645,\"sys\":{\"type\":1,\"id\":5122,\"message\":0.0139,\"country\":\"US\",\"sunrise\":1560343627,\"sunset\":1560396563},\"timezone\":-25200,\"id\":420006353,\"name\":\"MountainView\",\"cod\":200}\"";
 
@@ -119,12 +120,12 @@ int getWeatherStatus(OpenWeatherParse &weather)
 
 	if (error_code == PARSE_DONE)
 	{
-		error = 0;
+		error = NO_ERROR;
 		weather.showInforInConsole();
 	}
 	else
 	{
-		error = 1;
+		error = ERROR;
 		SLOG_ERROR("Error code: %d", error_code);
 	}
 
@@ -239,17 +240,19 @@ void loop()
 	OpenWeatherParse weather_data;
 	WorldClockParse world_time;
 
-	while (1)
-	{
-		getWeatherStatus(weather_data);
-		delay(6000);
-		getCurrenTime(world_time);
-		delay(6000);
-	}
+	// while (1)
+	// {
+	// 	SLOG_DEBUG("Get weather data");
+	// 	getWeatherStatus(weather_data);
+	// 	delay(1000);
+
+	// 	SLOG_DEBUG("Get time data");
+	// 	getCurrenTime(world_time);
+	// 	delay(6000);
+	// }
 
 	while (1)
 	{
-		delay(1000);
 		if (getWeatherStatus(weather_data) == 0)
 		{
 			if (getCurrenTime(world_time) == 0)
@@ -268,5 +271,6 @@ void loop()
 		{
 			/* Show error on screen */
 		}
+		delay(60000);
 	}
 }

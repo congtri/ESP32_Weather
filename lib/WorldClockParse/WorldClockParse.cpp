@@ -18,7 +18,7 @@ WorldClockParse::~WorldClockParse()
 
 #define SEC_TO_UNIX_EPOCH 11644473600LL
 
-void WorldClockParse::convertFileTimeToHumanTime(long long int seconds)
+void WorldClockParse::convertFileTimeToHumanTime(long long int seconds, int8_t GMT_time)
 {
 	// Number of days in month
 	// in normal year
@@ -27,6 +27,8 @@ void WorldClockParse::convertFileTimeToHumanTime(long long int seconds)
 	long int currYear, daysTillNow, extraTime, extraDays, index, date, month, hours, minutes, secondss, flag = 0;
 	seconds /= (10000000LL);
 	seconds -= SEC_TO_UNIX_EPOCH;
+	seconds = seconds + (GMT_time * 3600); /* 3600 is the number of second in one hour */
+
 	// Calculate total days unix time T
 	daysTillNow = seconds / (24 * 60 * 60);
 	extraTime = seconds % (24 * 60 * 60);
@@ -134,7 +136,7 @@ int WorldClockParse::parseWorldClockData(String &json)
 	if (this->json_value.length)
 	{
 		this->convertDataTollint(this->json_value, i_value);
-		this->convertFileTimeToHumanTime(i_value);
+		this->convertFileTimeToHumanTime(i_value, 7);  /* VN time is GMT +7 */
 		Serial.printf("\n%02d:%02d:%02d - %02d/%02d/%4d", this->time.hour, this->time.min, this->time.sec, this->time.day, this->time.month, this->time.year);
 	}
 	else

@@ -32,7 +32,7 @@ public:
 	~WorldClockParse();
 
 	int parseWorldClockData(String &json);
-	void convertFileTimeToHumanTime(long long int seconds);
+	void convertFileTimeToHumanTime(long long int seconds, int8_t GMT_time);
 };
 
 
