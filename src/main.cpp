@@ -239,6 +239,8 @@ void loop()
 {
 	OpenWeatherParse weather_data;
 	WorldClockParse world_time;
+	int old_temperature = 0;
+	int8_t prv_min = 0;
 
 	// while (1)
 	// {
@@ -253,24 +255,30 @@ void loop()
 
 	while (1)
 	{
-		if (getWeatherStatus(weather_data) == 0)
+		if (getWeatherStatus(weather_data) == NO_ERROR)
 		{
-			if (getCurrenTime(world_time) == 0)
+			if (getCurrenTime(world_time) == NO_ERROR)
 			{
-				weather_data.time.day = world_time.time.day;
-				weather_data.time.month = world_time.time.month;
-				weather_data.time.year = world_time.time.year;
+				if(world_time.time.min != prv_min || old_temperature != weather_data.weather.temp)
+				{
+					weather_data.time.day = world_time.time.day;
+					weather_data.time.month = world_time.time.month;
+					weather_data.time.year = world_time.time.year;
 
-				weather_data.time.hour = world_time.time.hour;
-				weather_data.time.min = world_time.time.min;
+					weather_data.time.hour = world_time.time.hour;
+					weather_data.time.min = world_time.time.min;
+
+					old_temperature = weather_data.weather.temp;
+					prv_min = world_time.time.min;
+
+					displayToScreen(weather_data);
+				}
 			}
-
-			displayToScreen(weather_data);
 		}
 		else
 		{
 			/* Show error on screen */
 		}
-		delay(60000);
+		delay(10000);
 	}
 }
