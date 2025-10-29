@@ -52,27 +52,28 @@ typedef enum
 {
 	PARSE_DONE = 0,
 	PARSE_ID_ERROR,
-	PARSE_DES_ERROR,
+	PARSE_DESCRIPTION_ERROR,
 	PARSE_ICON_ERROR,
 	PARSE_TEMP_ERROR,
-	PARSE_FEELLIKE_ERROR,
+	PARSE_FEELS_LIKE_ERROR,
 	PARSE_TEMP_MIN_ERROR,
 	PARSE_TEMP_MAX_ERROR,
 	PARSE_PRESSURE_ERROR,
 	PARSE_HUMIDITY_ERROR,
 	PARSE_COUNTRY_ERROR,
-	PARSE_CITYNAME_ERROR,
+	PARSE_CITY_NAME_ERROR,
 	PARSE_TIMEZONE_ERROR,
 	PARSE_TIME_ERROR,
-	PARSE_ERROR_UNDEFINE
-}paser_error_code_e;
+	PARSE_JSON_INVALID,
+	PARSE_ERROR_UNDEFINED
+}parser_error_code_e;
 
-class OpenWeatherParse:SimpleJson
+class OpenWeatherParse : public SimpleJson
 {
 private:
-
-	
 	void convertUnixTimeToHumanTime(long int seconds);
+	bool isValidIconCode(const String& icon);
+	void safeStringCopy(char* dest, const String& src, size_t destSize);
 	
 public:
 	zone_st			location;
@@ -82,9 +83,10 @@ public:
 	OpenWeatherParse();
 	~OpenWeatherParse();
 	static OpenWeatherParse *getInstance();
-	void showInforInConsole();
-	paser_error_code_e parseOpenWeatherData(String &weather_data);
+	void showInfoInConsole();
+	parser_error_code_e parseOpenWeatherData(String &weather_data);
 	char getIconCode();
+	const char* getErrorMessage(parser_error_code_e error);
 	
 };
 

@@ -20,21 +20,36 @@ typedef struct
 	uint8_t sec;
 } world_time_st;
 
-class WorldClockParse:public SimpleJson
+typedef enum
+{
+	WORLD_CLOCK_PARSE_SUCCESS = 0,
+	WORLD_CLOCK_PARSE_JSON_INVALID,
+	WORLD_CLOCK_PARSE_TIME_NOT_FOUND,
+	WORLD_CLOCK_PARSE_TIME_INVALID,
+	WORLD_CLOCK_PARSE_TIMEZONE_INVALID,
+	WORLD_CLOCK_PARSE_ERROR_UNDEFINED
+} world_clock_error_code_e;
+
+class WorldClockParse : public SimpleJson
 {
 private:
-	/* data */
+	/* Helper methods */
+	bool isValidTimezone(int8_t timezone);
+	bool isLeapYear(uint16_t year);
+	void initializeTimeStruct();
+
 public:
 	world_time_st time;
 
-	WorldClockParse(/* args */);
-	WorldClockParse(String &json);
+	WorldClockParse();
+	WorldClockParse(const String &json);
 	~WorldClockParse();
 
-	int parseWorldClockData(String &json);
-	void convertFileTimeToHumanTime(long long int seconds, int8_t GMT_time);
+	world_clock_error_code_e parseWorldClockData(const String &json, int8_t timezoneOffset = 7);
+	int parseWorldClockData(String &json);  // Legacy compatibility method
+	void convertFileTimeToHumanTime(long long int seconds, int8_t timezoneOffset);
+	void showTimeInConsole() const;
+	const char* getErrorMessage(world_clock_error_code_e errorCode) const;
 };
-
-
 
 #endif

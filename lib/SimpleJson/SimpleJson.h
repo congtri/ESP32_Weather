@@ -2,38 +2,38 @@
 #define _SIMPLE_JSON_H_
 #include <WString.h>
 #include <stdint.h>
-#include <iostream>
-#include <string>
-#include <WString.h>
 #include <Arduino.h>
-
-typedef struct
-{
-	char *data;
-	int length;
-} value_data_st;
 
 class SimpleJson
 {
 private:
 	String *json_string;
+	String temp_value; // Safe storage for extracted values
+	
+	// Helper method for proper key matching
+	int findKeyPosition(String &json, String key);
 	
 public:
-	value_data_st json_value;
-
-	SimpleJson(/* args */);
+	// Constructors and destructor
+	SimpleJson();
 	SimpleJson(String *json);
 	~SimpleJson();
-	int findJsonValue(String &json_data, String key);
-	int findJsonValue(String key);
-
-	void initJsonString(String *json);
-	void showJsonValueData();
-
-	uint8_t convertDataToInt(value_data_st &jdata, int &int_number);
-	uint8_t convertDataTollint(value_data_st &jdata, long long int &llint_number);
-	uint8_t convertDataToFloat(value_data_st &jdata, float &float_number);
-
+	
+	// Modern API with clear naming conventions
+	bool setJsonData(String *json);                    
+	bool parseValue(String key);                       
+	bool parseValueFromJson(String &json_data, String key); 
+	void printParsedValue();                          
+	
+	// Type conversion methods with clear names
+	bool convertToInt(int &result);                   
+	bool convertToLongLong(long long &result);        
+	bool convertToFloat(float &result);               
+	
+	// Utility methods
+	bool hasValidData();                              
+	int getValueLength();                             
+	String getValueAsString();                        
 };
 
 #endif

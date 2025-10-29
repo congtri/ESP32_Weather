@@ -1,0 +1,275 @@
+#ifndef WEB_SETUP_H
+#define WEB_SETUP_H
+
+#include <Arduino.h>
+
+// Auto-generated header file from web/setup.html
+// Generated on: Wed Oct 29 20:20:19 +07 2025
+// Script: html_to_headers.sh
+
+const char SETUP_HTML[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32 Weather Station Setup</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            padding: 40px;
+            width: 100%;
+            max-width: 500px;
+            animation: slideUp 0.6s ease-out;
+        }
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        h1 {
+            color: #333;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 16px;
+        }
+        .form-group {
+            margin-bottom: 25px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        input[type="text"], input[type="password"], select {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e1e1e1;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+        input[type="text"]:focus, input[type="password"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        .btn:active {
+            transform: translateY(0);
+        }
+        .scan-btn {
+            background: #28a745;
+            margin-bottom: 15px;
+            padding: 12px;
+            font-size: 16px;
+        }
+        .network-list {
+            max-height: 150px;
+            overflow-y: auto;
+            border: 2px solid #e1e1e1;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+        .network-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: background-color 0.2s ease;
+        }
+        .network-item:hover {
+            background-color: #f8f9fa;
+        }
+        .network-item:last-child {
+            border-bottom: none;
+        }
+        .signal-strength {
+            font-size: 12px;
+            color: #666;
+        }
+        .loading {
+            text-align: center;
+            color: #666;
+            padding: 15px;
+        }
+        .status-message {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+            font-weight: 600;
+        }
+        .status-success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status-error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .note {
+            background-color: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 0 8px 8px 0;
+        }
+        .note-title {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+        .note-text {
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">🌤️</div>
+            <h1>ESP32 Weather Station</h1>
+            <p class="subtitle">Configure your WiFi connection</p>
+        </div>
+        
+        <form id="wifiForm" action="/save" method="POST">
+            <div class="form-group">
+                <label for="ssid">WiFi Network:</label>
+                <button type="button" class="btn scan-btn" onclick="scanNetworks()">📡 Scan Networks</button>
+                <div id="networkList" class="network-list" style="display: none;"></div>
+                <input type="text" id="ssid" name="ssid" placeholder="Enter WiFi network name" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">WiFi Password:</label>
+                <input type="password" id="password" name="password" placeholder="Enter WiFi password">
+            </div>
+            
+            <button type="submit" class="btn">💾 Save Configuration</button>
+        </form>
+        
+        <div class="note">
+            <div class="note-title">📋 Setup Instructions:</div>
+            <div class="note-text">
+                1. Click "Scan Networks" to find available WiFi networks<br>
+                2. Select your network or enter manually<br>
+                3. Enter your WiFi password<br>
+                4. Click "Save Configuration" to connect
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function scanNetworks() {
+            const networkList = document.getElementById('networkList');
+            const scanBtn = document.querySelector('.scan-btn');
+            
+            scanBtn.innerHTML = '🔄 Scanning...';
+            scanBtn.disabled = true;
+            networkList.style.display = 'block';
+            networkList.innerHTML = '<div class="loading">Scanning for networks...</div>';
+            
+            fetch('/scan')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.networks && data.networks.length > 0) {
+                        networkList.innerHTML = '';
+                        data.networks.forEach(network => {
+                            const item = document.createElement('div');
+                            item.className = 'network-item';
+                            item.innerHTML = `
+                                <span>${network.ssid}</span>
+                                <span class="signal-strength">${getSignalIcon(network.rssi)} ${network.rssi}dBm</span>
+                            `;
+                            item.onclick = () => selectNetwork(network.ssid);
+                            networkList.appendChild(item);
+                        });
+                    } else {
+                        networkList.innerHTML = '<div class="loading">No networks found</div>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Scan failed:', error);
+                    networkList.innerHTML = '<div class="loading">Scan failed. Please try again.</div>';
+                })
+                .finally(() => {
+                    scanBtn.innerHTML = '📡 Scan Networks';
+                    scanBtn.disabled = false;
+                });
+        }
+        
+        function selectNetwork(ssid) {
+            document.getElementById('ssid').value = ssid;
+            document.getElementById('networkList').style.display = 'none';
+        }
+        
+        function getSignalIcon(rssi) {
+            if (rssi > -50) return '📶';
+            if (rssi > -70) return '📶';
+            if (rssi > -80) return '📶';
+            return '📶';
+        }
+        
+        document.getElementById('wifiForm').addEventListener('submit', function(e) {
+            const submitBtn = document.querySelector('button[type="submit"]');
+            submitBtn.innerHTML = '⏳ Saving...';
+            submitBtn.disabled = true;
+        });
+    </script>
+</body>
+</html>)rawliteral";
+
+#endif // WEB_SETUP_H

@@ -31,10 +31,63 @@ const icon_map_t icon_map[] = {
 
 OpenWeatherParse::OpenWeatherParse()
 {
+	// Initialize all structures to zero
+	memset(&location, 0, sizeof(location));
+	memset(&weather, 0, sizeof(weather));
+	memset(&time, 0, sizeof(time));
+	
+	// Set default values
+	weather.icon_code = ')'; // Default "not available" icon
 }
 
 OpenWeatherParse::~OpenWeatherParse()
 {
+}
+
+// Helper method for safe string copying
+void OpenWeatherParse::safeStringCopy(char* dest, const String& src, size_t destSize)
+{
+	if (dest == nullptr || destSize == 0) return;
+	
+	memset(dest, '\0', destSize);
+	size_t copyLen = (src.length() < destSize - 1) ? src.length() : destSize - 1;
+	strncpy(dest, src.c_str(), copyLen);
+}
+
+// Helper method to validate icon codes
+bool OpenWeatherParse::isValidIconCode(const String& icon)
+{
+	if (icon.length() != 3) return false;
+	
+	for (uint8_t idx = 0; idx < ICON_MAP_TABLE_SIZE; idx++) {
+		if (icon.equals(icon_map[idx].icon)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+// Get error message for debugging
+const char* OpenWeatherParse::getErrorMessage(parser_error_code_e error)
+{
+	switch (error) {
+		case PARSE_DONE: return "Success";
+		case PARSE_ID_ERROR: return "Weather ID parsing failed";
+		case PARSE_DESCRIPTION_ERROR: return "Description parsing failed";
+		case PARSE_ICON_ERROR: return "Icon parsing failed";
+		case PARSE_TEMP_ERROR: return "Temperature parsing failed";
+		case PARSE_FEELS_LIKE_ERROR: return "Feels like temperature parsing failed";
+		case PARSE_TEMP_MIN_ERROR: return "Minimum temperature parsing failed";
+		case PARSE_TEMP_MAX_ERROR: return "Maximum temperature parsing failed";
+		case PARSE_PRESSURE_ERROR: return "Pressure parsing failed";
+		case PARSE_HUMIDITY_ERROR: return "Humidity parsing failed";
+		case PARSE_COUNTRY_ERROR: return "Country parsing failed";
+		case PARSE_CITY_NAME_ERROR: return "City name parsing failed";
+		case PARSE_TIMEZONE_ERROR: return "Timezone parsing failed";
+		case PARSE_TIME_ERROR: return "Time parsing failed";
+		case PARSE_JSON_INVALID: return "Invalid JSON format";
+		default: return "Unknown error";
+	}
 }
 
 // Unix time is in seconds and
@@ -149,20 +202,26 @@ void OpenWeatherParse::convertUnixTimeToHumanTime(long int seconds)
 }
 
 
-paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
+parser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 {
 	uint8_t idx = 0;
-	char icon_buf[4] = {0};
-	long int i_value = 0; /* This variable is used to converd from char to int */
-	float f_value = 0;	  /* This variable is used to converd from char to float */
-	this->initJsonString(&weather_data);
+	int i_value = 0;     /* This variable is used to convert from string to int */
+	float f_value = 0;   /* This variable is used to convert from string to float */
+	
+	// Validate input
+	if (weather_data.length() == 0) {
+		return PARSE_JSON_INVALID;
+	}
+	
+	// Use modern API to set JSON data
+	if (!this->setJsonData(&weather_data)) {
+		return PARSE_JSON_INVALID;
+	}
 
 	/* Parse weather id */
-	this->findJsonValue("id");
-	if (this->json_value.length)
+	if (this->parseValue("id") && this->convertToInt(i_value))
 	{
-		i_value = atoi(this->json_value.data);
-		this->weather.id = (int)i_value;
+		this->weather.id = i_value;
 	}
 	else
 	{
@@ -170,30 +229,31 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 	}
 
 	/* Parse weather description */
-	this->findJsonValue(weather_data, "description");
-	if (this->json_value.length)
+	if (this->parseValueFromJson(weather_data, "description"))
 	{
-		memset(this->weather.description, '\0', 40);
-		memcpy(this->weather.description, this->json_value.data, this->json_value.length);
+		String description = this->getValueAsString();
+		this->safeStringCopy(this->weather.description, description, sizeof(this->weather.description));
 	}
 	else
 	{
-		return PARSE_DES_ERROR;
+		return PARSE_DESCRIPTION_ERROR;
 	}
 
 	/* Parse weather icon */
-	this->findJsonValue(weather_data, "icon");
-	if (this->json_value.length)
+	if (this->parseValueFromJson(weather_data, "icon"))
 	{
-		memset(icon_buf, '\0', sizeof(icon_buf));
-		memcpy(icon_buf, this->json_value.data, this->json_value.length); /* expected lenght is 3 */
-		this->weather.icon_code = ')';							  /* NA data icon */
-		for (idx = 0; idx < ICON_MAP_TABLE_SIZE; idx++)
-		{
-			if (strcmp(icon_buf, icon_map[idx].icon) == 0)
+		String icon = this->getValueAsString();
+		
+		// Validate and set icon code
+		this->weather.icon_code = ')'; /* Default NA data icon */
+		if (this->isValidIconCode(icon)) {
+			for (idx = 0; idx < ICON_MAP_TABLE_SIZE; idx++)
 			{
-				this->weather.icon_code = icon_map[idx].code;
-				break;
+				if (icon.equals(icon_map[idx].icon))
+				{
+					this->weather.icon_code = icon_map[idx].code;
+					break;
+				}
 			}
 		}
 	}
@@ -202,11 +262,9 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 		return PARSE_ICON_ERROR;
 	}
 
-	/* Parse tempareture data */
-	this->findJsonValue(weather_data, "temp");
-	if (this->json_value.length)
+	/* Parse temperature data */
+	if (this->parseValueFromJson(weather_data, "temp") && this->convertToFloat(f_value))
 	{
-		f_value = atof(this->json_value.data);
 		this->weather.temp = f_value;
 	}
 	else
@@ -214,23 +272,19 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 		return PARSE_TEMP_ERROR;
 	}
 
-	/* Parse tempareture feels_like data */
-	this->findJsonValue(weather_data, "feels_like");
-	if (this->json_value.length)
+	/* Parse temperature feels_like data */
+	if (this->parseValueFromJson(weather_data, "feels_like") && this->convertToFloat(f_value))
 	{
-		f_value = atof(this->json_value.data);
 		this->weather.feels_like = f_value;
 	}
 	else
 	{
-		return PARSE_FEELLIKE_ERROR;
+		return PARSE_FEELS_LIKE_ERROR;
 	}
 
-	/* Parse tempareture temp_min data */
-	this->findJsonValue(weather_data, "temp_min");
-	if (this->json_value.length)
+	/* Parse temperature temp_min data */
+	if (this->parseValueFromJson(weather_data, "temp_min") && this->convertToFloat(f_value))
 	{
-		f_value = atof(this->json_value.data);
 		this->weather.temp_min = f_value;
 	}
 	else
@@ -238,11 +292,9 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 		return PARSE_TEMP_MIN_ERROR;
 	}
 
-	/* Parse tempareture temp_max data */
-	this->findJsonValue(weather_data, "temp_max");
-	if (this->json_value.length)
+	/* Parse temperature temp_max data */
+	if (this->parseValueFromJson(weather_data, "temp_max") && this->convertToFloat(f_value))
 	{
-		f_value = atof(this->json_value.data);
 		this->weather.temp_max = f_value;
 	}
 	else
@@ -251,10 +303,8 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 	}
 
 	/* Parse pressure data */
-	this->findJsonValue(weather_data, "pressure");
-	if (this->json_value.length)
+	if (this->parseValueFromJson(weather_data, "pressure") && this->convertToInt(i_value))
 	{
-		i_value = atoi(this->json_value.data);
 		this->weather.pressure = i_value;
 	}
 	else
@@ -263,10 +313,8 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 	}
 
 	/* Parse humidity data */
-	this->findJsonValue(weather_data, "humidity");
-	if (this->json_value.length)
+	if (this->parseValueFromJson(weather_data, "humidity") && this->convertToInt(i_value))
 	{
-		i_value = atoi(this->json_value.data);
 		this->weather.humidity = i_value;
 	}
 	else
@@ -275,11 +323,10 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 	}
 
 	/* Parse location data */
-	this->findJsonValue(weather_data, "country");
-	if (this->json_value.length)
+	if (this->parseValueFromJson(weather_data, "country"))
 	{
-		memset(this->location.country, '\0', LOCATION_SIZE);
-		memcpy(this->location.country, this->json_value.data, this->json_value.length);
+		String country = this->getValueAsString();
+		this->safeStringCopy(this->location.country, country, sizeof(this->location.country));
 	}
 	else
 	{
@@ -287,22 +334,19 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 	}
 
 	/* Parse city name data */
-	this->findJsonValue(weather_data, "name");
-	if (this->json_value.length)
+	if (this->parseValueFromJson(weather_data, "name"))
 	{
-		memset(this->location.city, '\0', LOCATION_SIZE);
-		memcpy(this->location.city, this->json_value.data, this->json_value.length);
+		String city = this->getValueAsString();
+		this->safeStringCopy(this->location.city, city, sizeof(this->location.city));
 	}
 	else
 	{
-		return PARSE_CITYNAME_ERROR;
+		return PARSE_CITY_NAME_ERROR;
 	}
 
 	/* Parse timezone data */
-	this->findJsonValue(weather_data, "timezone");
-	if (this->json_value.length)
+	if (this->parseValueFromJson(weather_data, "timezone") && this->convertToInt(i_value))
 	{
-		i_value = atoi(this->json_value.data);
 		this->location.timezone = i_value;
 	}
 	else
@@ -311,10 +355,8 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 	}
 
 	/* Get date and time data */
-	this->findJsonValue(weather_data, "dt");
-	if (this->json_value.length)
+	if (this->parseValueFromJson(weather_data, "dt") && this->convertToInt(i_value))
 	{
-		i_value = atoi(this->json_value.data);
 		i_value = i_value + this->location.timezone;
 		convertUnixTimeToHumanTime(i_value);
 	}
@@ -322,14 +364,15 @@ paser_error_code_e OpenWeatherParse::parseOpenWeatherData(String &weather_data)
 	{
 		return PARSE_TIME_ERROR;
 	}
+	
 	return PARSE_DONE;
 }
 
-void OpenWeatherParse::showInforInConsole()
+void OpenWeatherParse::showInfoInConsole()
 {
 	Serial.printf("\n%s - %s - Timezone: %d", this->location.city, this->location.country, this->location.timezone);
 	Serial.printf("\n%02d:%02d:%02d - %02d/%02d/%4d", this->time.hour, this->time.min, this->time.sec, this->time.day, this->time.month, this->time.year);
 	Serial.printf("\nWeather ID: %d - icon code: %d - Description: %s", this->weather.id, this->weather.icon_code, this->weather.description);
 	Serial.printf("\nTemperature: %.02f - Feel like: %.02f - Min: %.02f - Max: %.02f", this->weather.temp, this->weather.feels_like, this->weather.temp_min, this->weather.temp_max);
-	Serial.printf("\nPessure: %d - Humidity: %d", this->weather.pressure, this->weather.humidity);
+	Serial.printf("\nPressure: %d - Humidity: %d", this->weather.pressure, this->weather.humidity);
 }
