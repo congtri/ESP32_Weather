@@ -1,5 +1,50 @@
+# PlatformIO files
 .pio
 .vscode/.browse.c_cpp.db*
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Windows system files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux system files
+*~
+.fuse_hidden*
+.nfs*
+
+# IDE and editor files
+*.swp
+*.swo
+*~
+.vscode/settings.json
+.idea/
+*.sublime-*
+
+# Backup files
+*.bak
+*.backup
+*.tmp
+*.temp
+
+# Log files
+*.log
+
+# Build artifacts
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
